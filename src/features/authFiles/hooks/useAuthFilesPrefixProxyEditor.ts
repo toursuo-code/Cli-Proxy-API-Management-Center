@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { authFilesApi, type AuthFileFieldsPatch } from '@/services/api';
 import type { AuthFileItem } from '@/types';
 import { useNotificationStore } from '@/stores';
-import { parsePriorityValue } from '@/features/authFiles/constants';
+import { parseDisableCoolingValue, parsePriorityValue } from '@/features/authFiles/constants';
 
 type AuthFileHeaders = Record<string, string>;
 type AuthFileHeadersErrorKey =
@@ -11,7 +11,13 @@ type AuthFileHeadersErrorKey =
   | 'auth_files.headers_invalid_object'
   | 'auth_files.headers_invalid_value';
 
-export type PrefixProxyEditorField = 'prefix' | 'proxyUrl' | 'priority' | 'note' | 'headersText';
+export type PrefixProxyEditorField =
+  | 'prefix'
+  | 'proxyUrl'
+  | 'priority'
+  | 'note'
+  | 'headersText'
+  | 'disableCooling';
 
 export type PrefixProxyEditorFieldValue = string;
 
@@ -27,6 +33,7 @@ export type PrefixProxyEditorState = {
   prefix: string;
   proxyUrl: string;
   priority: string;
+  disableCooling: string;
   note: string;
   noteTouched: boolean;
   headersText: string;
@@ -89,6 +96,10 @@ const parseHeadersText = (
 
 const normalizeTextField = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
+
+const hasDisableCoolingField = (value: Record<string, unknown>): boolean =>
+  Object.prototype.hasOwnProperty.call(value, 'disable_cooling') ||
+  Object.prototype.hasOwnProperty.call(value, 'disable-cooling');
 
 const hasKeys = (value: Record<string, unknown> | AuthFileFieldsPatch | null): boolean =>
   Boolean(value && Object.keys(value).length > 0);
@@ -197,6 +208,24 @@ const buildAuthFileFieldsPatch = (
     }
   }
 
+  const disableCoolingText = editor.disableCooling.trim();
+  const nextDisableCooling = parseDisableCoolingValue(disableCoolingText);
+  const originalDisableCoolingRaw =
+    original.disable_cooling !== undefined ? original.disable_cooling : original['disable-cooling'];
+  const originalDisableCooling = parseDisableCoolingValue(originalDisableCoolingRaw);
+  const originalHasDisableCooling = hasDisableCoolingField(original);
+  if (!disableCoolingText) {
+    if (originalHasDisableCooling) {
+      patch.disable_cooling = null;
+    }
+  } else if (nextDisableCooling !== undefined) {
+    if (!originalHasDisableCooling || nextDisableCooling !== originalDisableCooling) {
+      patch.disable_cooling = nextDisableCooling;
+    }
+  } else if (originalHasDisableCooling) {
+    patch.disable_cooling = null;
+  }
+
   if (editor.headersTouched) {
     const { value: parsedHeaders, errorKey } = parseHeadersText(editor.headersText);
     if (errorKey) {
@@ -249,6 +278,16 @@ const buildPrefixProxyUpdatedText = (
       next.note = patch.note;
     } else if ('note' in next) {
       delete next.note;
+    }
+  }
+
+  if (patch.disable_cooling !== undefined) {
+    if (patch.disable_cooling === null) {
+      delete next.disable_cooling;
+      delete next['disable-cooling'];
+    } else {
+      next.disable_cooling = patch.disable_cooling;
+      delete next['disable-cooling'];
     }
   }
 
@@ -306,6 +345,7 @@ export function useAuthFilesPrefixProxyEditor(
       prefix: '',
       proxyUrl: '',
       priority: '',
+      disableCooling: '',
       note: '',
       noteTouched: false,
       headersText: '',
@@ -353,6 +393,9 @@ export function useAuthFilesPrefixProxyEditor(
       const prefix = typeof json.prefix === 'string' ? json.prefix : '';
       const proxyUrl = typeof json.proxy_url === 'string' ? json.proxy_url : '';
       const priority = parsePriorityValue(json.priority);
+      const disableCoolingRaw =
+        json.disable_cooling !== undefined ? json.disable_cooling : json['disable-cooling'];
+      const disableCooling = parseDisableCoolingValue(disableCoolingRaw);
       const note = typeof json.note === 'string' ? json.note : '';
       const headers = json.headers;
       let headersText = '';
@@ -374,6 +417,8 @@ export function useAuthFilesPrefixProxyEditor(
           prefix,
           proxyUrl,
           priority: priority !== undefined ? String(priority) : '',
+          disableCooling:
+            disableCooling === undefined ? '' : disableCooling ? 'true' : 'false',
           note,
           noteTouched: false,
           headersText,
@@ -401,6 +446,7 @@ export function useAuthFilesPrefixProxyEditor(
       if (field === 'prefix') return { ...prev, prefix: String(value) };
       if (field === 'proxyUrl') return { ...prev, proxyUrl: String(value) };
       if (field === 'priority') return { ...prev, priority: String(value) };
+      if (field === 'disableCooling') return { ...prev, disableCooling: String(value) };
       if (field === 'note') return { ...prev, note: String(value), noteTouched: true };
       if (field === 'headersText') {
         const headersText = String(value);

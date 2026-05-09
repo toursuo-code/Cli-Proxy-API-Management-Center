@@ -131,6 +131,14 @@ export function AuthFilesPrefixProxyEditorModal(props: AuthFilesPrefixProxyEdito
                   disabled={disableControls || editor.saving || !editor.json}
                   onChange={(e) => onChange('priority', e.target.value)}
                 />
+                <Input
+                  label={t('auth_files.disable_cooling_label')}
+                  value={editor.disableCooling}
+                  placeholder={t('auth_files.disable_cooling_placeholder')}
+                  hint={t('auth_files.disable_cooling_hint')}
+                  disabled={disableControls || editor.saving || !editor.json}
+                  onChange={(e) => onChange('disableCooling', e.target.value)}
+                />
                 <div className="form-group">
                   <label>{t('auth_files.headers_label')}</label>
                   <textarea
