@@ -747,7 +747,15 @@
   }
 
   .recordLine {
-    grid-template-columns: minmax(220px, 1.4fr) repeat(6, minmax(90px, 0.7fr)) minmax(170px, 1fr);
+    grid-template-columns:
+      minmax(220px, 1.5fr)
+      minmax(72px, 0.38fr)
+      minmax(64px, 0.34fr)
+      minmax(136px, 0.72fr)
+      minmax(76px, 0.4fr)
+      minmax(136px, 0.82fr)
+      minmax(112px, 0.64fr)
+      minmax(164px, 0.92fr);
     gap: 8px 10px;
   }
 
@@ -775,7 +783,15 @@
 
 .recordLine {
   display: grid;
-  grid-template-columns: minmax(240px, 1.8fr) repeat(6, minmax(96px, 0.72fr)) minmax(190px, 1.1fr);
+  grid-template-columns:
+    minmax(240px, 1.65fr)
+    minmax(82px, 0.42fr)
+    minmax(74px, 0.36fr)
+    minmax(148px, 0.78fr)
+    minmax(86px, 0.42fr)
+    minmax(150px, 0.88fr)
+    minmax(118px, 0.66fr)
+    minmax(188px, 0.96fr);
   gap: 10px 12px;
   align-items: start;
 }
@@ -784,6 +800,14 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+}
+
+.recordFieldNarrow {
+  min-width: 0;
+}
+
+.recordFieldUsage {
   min-width: 0;
 }
 
@@ -910,6 +934,38 @@
   line-height: 1;
   white-space: nowrap;
   letter-spacing: 0.02em;
+}
+
+.cacheMarkerBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  color: #8a4b00;
+  background: rgba(255, 204, 102, 0.22);
+  border: 1px solid rgba(214, 138, 0, 0.28);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color $transition-fast,
+    border-color $transition-fast,
+    opacity $transition-fast;
+  appearance: none;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 204, 102, 0.3);
+    border-color: rgba(214, 138, 0, 0.42);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.56;
+  }
 }
 
 .stateBadgeActive {
@@ -1048,6 +1104,35 @@
 
 .priorityValue {
   font-variant-numeric: tabular-nums;
+}
+
+.usageTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.usageTag {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.usageTagSuccess {
+  color: var(--success-badge-text, #065f46);
+  background: color-mix(in srgb, var(--success-badge-bg, #d1fae5) 72%, transparent);
+}
+
+.usageTagFailure {
+  color: var(--failure-badge-text);
+  background: color-mix(in srgb, var(--failure-badge-bg) 72%, transparent);
 }
 
 .noteText {

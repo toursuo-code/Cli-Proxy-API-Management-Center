@@ -30,6 +30,7 @@ export interface AuthFileItem {
   unavailable?: boolean;
   status?: string;
   statusMessage?: string;
+  disable_cooling?: boolean;
   lastRefresh?: string | number;
   modified?: number;
   success?: unknown;

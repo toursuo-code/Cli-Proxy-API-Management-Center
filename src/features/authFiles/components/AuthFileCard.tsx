@@ -32,11 +32,13 @@ export type AuthFileCardProps = {
   resolvedTheme: ResolvedTheme;
   disableControls: boolean;
   deleting: string | null;
+  cacheResetting: boolean;
   statusUpdating: Record<string, boolean>;
   quotaFilterType: QuotaProviderType | null;
   statusBarCache: Map<string, AuthFileStatusBarData>;
   onShowModels: (file: AuthFileItem) => void;
   onDownload: (name: string) => void;
+  onCacheMarkerReset: () => void;
   onOpenPrefixProxyEditor: (file: AuthFileItem) => void;
   onDelete: (name: string) => void;
   onToggleStatus: (file: AuthFileItem, enabled: boolean) => void;
@@ -47,6 +49,14 @@ const resolveQuotaType = (file: AuthFileItem): QuotaProviderType | null => {
   const provider = resolveAuthProvider(file);
   if (!QUOTA_PROVIDER_TYPES.has(provider as QuotaProviderType)) return null;
   return provider as QuotaProviderType;
+};
+
+const formatAuthFileDisplayName = (name: string): string => {
+  const trimmed = String(name ?? '').trim();
+  if (!trimmed) return '';
+
+  const formatted = trimmed.replace(/^codex-/i, '').replace(/@.*$/, '');
+  return formatted || trimmed;
 };
 
 const formatPercent = (value: number): string => `${value.toFixed(1).replace(/\.0$/, '')}%`;
@@ -77,9 +87,7 @@ const getUsageLimitResetTimeLabel = (rawStatusMessage: string): string => {
 
     const root = parsed as Record<string, unknown>;
     const error =
-      root.error && typeof root.error === 'object'
-        ? (root.error as Record<string, unknown>)
-        : root;
+      root.error && typeof root.error === 'object' ? (root.error as Record<string, unknown>) : root;
     const errorType = typeof error.type === 'string' ? error.type.trim() : '';
 
     if (errorType !== 'usage_limit_reached') return '';
@@ -230,7 +238,9 @@ export function AuthFileCard(props: AuthFileCardProps) {
     resolvedTheme,
     disableControls,
     deleting,
+    cacheResetting,
     statusUpdating,
+    onCacheMarkerReset,
     onDownload,
     onOpenPrefixProxyEditor,
     onDelete,
@@ -266,6 +276,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
     file.disable_cooling ?? file['disable_cooling'] ?? file['disable-cooling']
   );
   const noteValue = typeof file.note === 'string' ? file.note.trim() : '';
+  const displayName = formatAuthFileDisplayName(file.name);
   const successRateLabel =
     totalRequests > 0 ? formatPercent((fileStats.success / totalRequests) * 100) : '-';
   const stateLabel = isRuntimeOnly
@@ -297,6 +308,7 @@ export function AuthFileCard(props: AuthFileCardProps) {
       : disableCoolingValue
         ? t('common.yes')
         : t('common.no');
+  const isCacheAccount = priorityValue === 200 && disableCoolingValue === true;
 
   return (
     <div
@@ -345,33 +357,49 @@ export function AuthFileCard(props: AuthFileCardProps) {
                   {typeLabel}
                 </span>
                 <span className={`${styles.stateBadge} ${stateBadgeClass}`}>{stateLabel}</span>
+                {isCacheAccount && (
+                  <button
+                    type="button"
+                    className={styles.cacheMarkerBadge}
+                    onClick={onCacheMarkerReset}
+                    disabled={disableControls || cacheResetting}
+                    title={t('auth_files.cache_marker_label')}
+                  >
+                    {t('auth_files.cache_marker_label')}
+                  </button>
+                )}
               </div>
-              <span className={styles.fileName} title={file.name}>
-                {file.name}
+              <span className={styles.fileName} title={displayName}>
+                {displayName}
               </span>
             </div>
           </div>
 
-          <div className={styles.recordField}>
+          <div className={`${styles.recordField} ${styles.recordFieldNarrow}`}>
             <span className={styles.recordLabel}>{t('auth_files.disable_cooling_list')}</span>
             <span className={styles.recordValue}>{disableCoolingLabel}</span>
           </div>
 
-          <div className={styles.recordField}>
+          <div className={`${styles.recordField} ${styles.recordFieldNarrow}`}>
             <span className={styles.recordLabel}>{t('auth_files.priority_display')}</span>
             <span className={`${styles.recordValue} ${styles.priorityValue}`}>
               {priorityValue ?? '-'}
             </span>
           </div>
 
-          <div className={styles.recordField}>
+          <div className={`${styles.recordField} ${styles.recordFieldUsage}`}>
             <span className={styles.recordLabel}>{t('auth_files.usage_display')}</span>
-            <span className={styles.recordValue}>
-              {fileStats.success}/{fileStats.failure}
-            </span>
+            <div className={`${styles.recordValue} ${styles.usageTags}`}>
+              <span className={`${styles.usageTag} ${styles.usageTagSuccess}`}>
+                {t('stats.success')} {fileStats.success.toLocaleString()}
+              </span>
+              <span className={`${styles.usageTag} ${styles.usageTagFailure}`}>
+                {t('stats.failure')} {fileStats.failure.toLocaleString()}
+              </span>
+            </div>
           </div>
 
-          <div className={styles.recordField}>
+          <div className={`${styles.recordField} ${styles.recordFieldNarrow}`}>
             <span className={styles.recordLabel}>{t('usage_stats.success_rate')}</span>
             <span className={styles.recordValue}>{successRateLabel}</span>
           </div>

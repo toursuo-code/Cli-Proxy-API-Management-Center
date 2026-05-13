@@ -31,6 +31,7 @@ export type UseAuthFilesDataResult = {
   uploading: boolean;
   deleting: string | null;
   deletingAll: boolean;
+  cacheResetting: boolean;
   statusUpdating: Record<string, boolean>;
   batchStatusUpdating: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -40,6 +41,7 @@ export type UseAuthFilesDataResult = {
   handleDelete: (name: string) => void;
   handleDeleteAll: (options: DeleteAllOptions) => void;
   handleDownload: (name: string) => Promise<void>;
+  handleCacheMarkerReset: () => void;
   handleStatusToggle: (item: AuthFileItem, enabled: boolean) => Promise<void>;
   toggleSelect: (name: string) => void;
   selectAllVisible: (visibleFiles: AuthFileItem[]) => void;
@@ -60,6 +62,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [cacheResetting, setCacheResetting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
   const [batchStatusUpdating, setBatchStatusUpdating] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -115,13 +118,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   }, []);
 
   const applyDeletedFiles = useCallback((names: string[]) => {
-    const deletedNames = Array.from(
-      new Set(
-        names
-          .map((name) => name.trim())
-          .filter(Boolean)
-      )
-    );
+    const deletedNames = Array.from(new Set(names.map((name) => name.trim()).filter(Boolean)));
     if (deletedNames.length === 0) return;
 
     const deletedSet = new Set(deletedNames);
@@ -171,6 +168,63 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       setLoading(false);
     }
   }, [t]);
+
+  const handleCacheMarkerReset = useCallback(() => {
+    if (cacheResetting) return;
+
+    const resolveCacheResetReason = (reason?: string): string => {
+      switch (reason) {
+        case 'no_cache_marker':
+          return t('auth_files.cache_reset_reason_no_cache_marker');
+        case 'no_reset_time':
+          return t('auth_files.cache_reset_reason_no_reset_time');
+        case 'threshold_not_met':
+          return t('auth_files.cache_reset_reason_threshold_not_met');
+        case 'no_candidate':
+          return t('auth_files.cache_reset_reason_no_candidate');
+        default:
+          return reason || t('common.unknown_error');
+      }
+    };
+
+    showConfirmation({
+      title: t('auth_files.cache_reset_confirm_title'),
+      message: t('auth_files.cache_reset_confirm_message'),
+      variant: 'danger',
+      confirmText: t('common.confirm'),
+      onConfirm: async () => {
+        setCacheResetting(true);
+        try {
+          const cacheResetResult = await authFilesApi.resetCacheMarker(true);
+
+          if (cacheResetResult.changed) {
+            const refreshedData = await authFilesApi.list();
+            setFiles(refreshedData?.files || []);
+            showNotification(
+              t('auth_files.cache_reset_applied', {
+                from: cacheResetResult.current_cache_name || '-',
+                to: cacheResetResult.next_cache_name || '-',
+              }),
+              'success'
+            );
+            return;
+          }
+
+          showNotification(
+            t('auth_files.cache_reset_skipped', {
+              reason: resolveCacheResetReason(cacheResetResult.reason),
+            }),
+            'info'
+          );
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : t('common.unknown_error');
+          showNotification(t('auth_files.cache_reset_failed', { message: errorMessage }), 'warning');
+        } finally {
+          setCacheResetting(false);
+        }
+      },
+    });
+  }, [cacheResetting, showConfirmation, showNotification, t]);
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -228,9 +282,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         }
 
         if (result.failed.length > 0) {
-          const details = result.failed
-            .map((item) => `${item.name}: ${item.error}`)
-            .join('; ');
+          const details = result.failed.map((item) => `${item.name}: ${item.error}`).join('; ');
           showNotification(`${t('notification.upload_failed')}: ${details}`, 'error');
         }
       } catch (err: unknown) {
@@ -330,9 +382,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
                 return;
               }
 
-              const result = await authFilesApi.deleteFiles(
-                filesToDelete.map((file) => file.name)
-              );
+              const result = await authFilesApi.deleteFiles(filesToDelete.map((file) => file.name));
               const success = result.deleted;
               const failed = result.failed.length;
 
@@ -527,7 +577,10 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
         );
 
         if (failCount === 0) {
-          showNotification(t('auth_files.batch_status_success', { count: successCount }), 'success');
+          showNotification(
+            t('auth_files.batch_status_success', { count: successCount }),
+            'success'
+          );
         } else {
           showNotification(
             t('auth_files.batch_status_partial', { success: successCount, failed: failCount }),
@@ -637,6 +690,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     uploading,
     deleting,
     deletingAll,
+    cacheResetting,
     statusUpdating,
     batchStatusUpdating,
     fileInputRef,
@@ -646,6 +700,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     handleDelete,
     handleDeleteAll,
     handleDownload,
+    handleCacheMarkerReset,
     handleStatusToggle,
     toggleSelect,
     selectAllVisible,
