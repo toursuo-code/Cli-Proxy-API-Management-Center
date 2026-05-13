@@ -100,7 +100,6 @@
   }
 }
 
-
 .filterAllIconWrap {
   position: relative;
   border-color: color-mix(in srgb, var(--primary-color) 20%, var(--border-color));
@@ -118,7 +117,6 @@
   display: block;
   color: color-mix(in srgb, var(--primary-color) 70%, var(--text-primary));
 }
-
 
 .filterContent {
   display: flex;
@@ -341,17 +339,18 @@
 
 // 卡片网格
 .fileGrid {
-  display: grid;
-  gap: $spacing-md;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .fileGridQuotaManaged {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  display: flex;
+  flex-direction: column;
 }
 
 .fileGridCompact {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
 }
 
 .antigravityGrid {
@@ -693,16 +692,12 @@
   background-color: color-mix(in srgb, var(--bg-primary) 78%, var(--bg-secondary));
   border-color: color-mix(in srgb, var(--border-color) 62%, transparent);
 
-  .providerAvatar,
-  .cardHeaderContent,
-  .cardMeta,
-  .healthStatusMessage,
-  .cardInsights {
+  .authListRow {
     opacity: 0.72;
   }
 
   .cardSelection,
-  .cardActions {
+  .recordActions {
     opacity: 1;
   }
 
@@ -717,16 +712,8 @@
   padding: 12px;
   border-radius: 10px;
 
-  .fileCardMain {
-    gap: 8px;
-  }
-
-  .cardHeader {
-    gap: 8px;
-  }
-
   .cardSelection {
-    margin-top: 6px;
+    margin-top: 2px;
   }
 
   .providerAvatar {
@@ -744,10 +731,6 @@
     font-size: 14px;
   }
 
-  .cardHeaderContent {
-    gap: 3px;
-  }
-
   .cardBadgeRow {
     gap: 4px;
   }
@@ -761,38 +744,19 @@
   .fileName {
     font-size: 13px;
     line-height: 1.3;
-    -webkit-line-clamp: 1;
   }
 
-  .healthStatusMessage {
-    padding: 6px 8px;
-    border-radius: 8px;
-    font-size: 11px;
+  .recordLine {
+    grid-template-columns: minmax(220px, 1.4fr) repeat(6, minmax(90px, 0.7fr)) minmax(170px, 1fr);
+    gap: 8px 10px;
   }
 
-  .quotaSection {
-    display: none;
+  .recordLabel {
+    font-size: 10px;
   }
 
-  .cardActions {
-    gap: 6px;
-    padding-top: 6px;
-  }
-
-  .cardActionsMain {
-    gap: 4px;
-  }
-
-  .primaryActionButton:global(.btn.btn-sm) {
-    flex: 0 1 auto;
-    min-width: 0;
-    padding-inline: 8px;
-  }
-
-  .cardUtilityActions {
-    gap: 2px;
-    padding: 2px;
-    border-radius: 6px;
+  .recordValue {
+    font-size: 12px;
   }
 
   .iconButton:global(.btn.btn-sm) {
@@ -801,14 +765,62 @@
     min-width: 28px;
     border-radius: 6px;
   }
+}
 
-  .statusToggle {
-    gap: 6px;
-  }
+.authListRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
-  .statusToggleLabel {
-    font-size: 10px;
-  }
+.recordLine {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.8fr) repeat(6, minmax(96px, 0.72fr)) minmax(190px, 1.1fr);
+  gap: 10px 12px;
+  align-items: start;
+}
+
+.recordField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.recordFieldName {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.recordFieldActions {
+  align-items: flex-start;
+}
+
+.recordLabel {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.recordValue {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.fileIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .fileCardLayout {
@@ -930,11 +942,53 @@
   color: var(--text-primary);
   word-break: break-all;
   line-height: 1.4;
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   letter-spacing: -0.01em;
+}
+
+.recordActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.statusToggleInline {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+}
+
+.errorLine {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding-top: 10px;
+  border-top: 1px dashed color-mix(in srgb, var(--border-color) 78%, transparent);
+}
+
+.errorLineWarning {
+  color: var(--warning-text);
+}
+
+.errorLabel {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.errorValue {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  word-break: break-word;
 }
 
 .cardMeta {
@@ -1496,23 +1550,24 @@
 }
 
 @include mobile {
-  .cardActions {
-    flex-wrap: wrap;
+  .recordLine {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
   }
 
-  .cardActionsMain {
-    flex-wrap: wrap;
+  .recordFieldName,
+  .recordFieldActions,
+  .errorLine {
+    grid-column: 1 / -1;
+  }
+
+  .recordActions {
     width: 100%;
   }
 
-  .primaryActionButton:global(.btn.btn-sm) {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .statusToggle {
-    width: 100%;
-    justify-content: space-between;
+  .errorLine {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 
