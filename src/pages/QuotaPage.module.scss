@@ -630,6 +630,67 @@
   color: var(--text-primary);
   word-break: break-all;
   line-height: 1.4;
+  flex: 1;
+  min-width: 0;
+}
+
+.cardRefreshButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color $transition-fast, color $transition-fast,
+    border-color $transition-fast, transform $transition-fast;
+
+  &:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--primary-color) 14%, var(--bg-secondary));
+    border-color: color-mix(in srgb, var(--primary-color) 38%, var(--border-color));
+    color: var(--primary-color);
+    transform: rotate(45deg);
+  }
+
+  &:active:not(:disabled) {
+    transform: rotate(90deg);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  svg {
+    display: block;
+  }
+}
+
+.cardRefreshButtonSpinning {
+  &,
+  &:hover:not(:disabled),
+  &:active:not(:disabled) {
+    transform: none;
+  }
+
+  svg {
+    animation: cardRefreshSpin 0.9s linear infinite;
+  }
+}
+
+@keyframes cardRefreshSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .pagination {

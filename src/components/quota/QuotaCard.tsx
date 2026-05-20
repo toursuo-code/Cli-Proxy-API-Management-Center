@@ -7,6 +7,7 @@ import type { ReactElement, ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ResolvedTheme, ThemeColors } from '@/types';
 import { TYPE_COLORS } from '@/utils/quota';
+import { IconRefreshCw } from '@/components/ui/icons';
 import styles from '@/pages/QuotaPage.module.scss';
 
 type QuotaStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -104,6 +105,13 @@ export function QuotaCard<TState extends QuotaStatusState>({
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
 
+  const isLoading = quotaStatus === 'loading';
+  const canTriggerRefresh = Boolean(onRefresh) && canRefresh && !isLoading;
+  const refreshTitle = t('quota_management.refresh_credential', {
+    name: item.name,
+    defaultValue: 'Refresh quota'
+  });
+
   return (
     <div className={`${styles.fileCard} ${cardClassName}`}>
       <div className={styles.cardHeader}>
@@ -118,6 +126,18 @@ export function QuotaCard<TState extends QuotaStatusState>({
           {getTypeLabel(displayType)}
         </span>
         <span className={styles.fileName}>{item.name}</span>
+        {onRefresh && (
+          <button
+            type="button"
+            className={`${styles.cardRefreshButton} ${isLoading ? styles.cardRefreshButtonSpinning : ''}`}
+            onClick={onRefresh}
+            disabled={!canTriggerRefresh}
+            title={refreshTitle}
+            aria-label={refreshTitle}
+          >
+            <IconRefreshCw size={14} />
+          </button>
+        )}
       </div>
 
       <div className={styles.quotaSection}>

@@ -1120,8 +1120,7 @@
           "disable_panel": "停用控制面板",
           "disable_panel_desc": "停用內建的 Web 控制面板",
           "secret_key": "管理金鑰",
-          "secret_key_placeholder": "設定管理金鑰",
-          "panel_repo": "面板儲存庫"
+          "secret_key_placeholder": "設定管理金鑰"
         },
         "auth": {
           "title": "驗證設定",
@@ -1269,6 +1268,7 @@
     "refresh_files": "重新整理驗證檔案",
     "refresh_files_and_quota": "重新整理驗證檔案&配額",
     "refresh_all_credentials": "重新整理全部憑證",
+    "refresh_credential": "重新整理此帳號配額",
     "card_idle_hint": "請使用頂部「重新整理全部憑證」按鈕取得最新配額。"
   },
   "system_info": {
@@ -1288,17 +1288,6 @@
     "models_empty": "未從 /models 取得到模型資料",
     "models_error": "取得模型清單失敗",
     "models_count": "可用模型 {{count}} 個",
-    "version_check_title": "版本檢查",
-    "version_check_desc": "呼叫 /latest-version 介面比對伺服器版本，提示是否有可用更新。",
-    "version_current_label": "目前版本",
-    "version_latest_label": "最新版本",
-    "version_check_button": "檢查更新",
-    "version_check_idle": "點擊檢查更新",
-    "version_checking": "正在檢查最新版本...",
-    "version_update_available": "有新版本可用：{{version}}",
-    "version_is_latest": "目前已是最新版本",
-    "version_check_error": "檢查更新失敗",
-    "version_current_missing": "未取得到伺服器版本號，暫無法比對",
     "version_unknown": "未知",
     "quick_links_title": "快速連結",
     "quick_links_desc": "存取專案儲存庫和文件，取得協助和更新。",
@@ -1430,6 +1419,12 @@
     "range_7h": "最近 7 小時",
     "range_24h": "最近 24 小時",
     "range_7d": "最近 7 天",
+    "range_custom": "自訂時間",
+    "range_custom_start": "起始時間",
+    "range_custom_end": "結束時間",
+    "range_custom_now": "現在",
+    "range_custom_clear": "清除",
+    "range_custom_hint": "請選擇起始或結束時間以過濾統計資料",
     "filter_all": "全部",
     "clear_filters": "清空篩選",
     "refresh": "重新整理",

@@ -15,33 +15,25 @@ import {
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select } from '@/components/ui/Select';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { providersApi } from '@/services/api';
-import { useThemeStore, useConfigStore } from '@/stores';
+import { useConfigStore } from '@/stores';
 import type { OpenAIProviderConfig } from '@/types';
 import {
   StatCards,
-  UsageChart,
-  ChartLineSelector,
   ApiDetailsCard,
   ModelStatsCard,
-  PriceSettingsCard,
   CredentialStatsCard,
   RequestEventsDetailsCard,
-  TokenBreakdownChart,
-  CostTrendChart,
-  ServiceHealthCard,
   useUsageData,
   useSparklines,
-  useChartData,
 } from '@/components/usage';
 import {
-  getModelNamesFromUsage,
   getApiStats,
   getModelStats,
   filterUsageByTimeRange,
   type UsageTimeRange,
+  type UsageTimeWindow,
 } from '@/utils/usage';
 import styles from './UsagePage.module.scss';
 
@@ -58,54 +50,23 @@ ChartJS.register(
   Filler
 );
 
-const CHART_LINES_STORAGE_KEY = 'cli-proxy-usage-chart-lines-v1';
-const TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-time-range-v1';
-const DEFAULT_CHART_LINES = ['all'];
+const TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-time-range-v2';
+const CUSTOM_RANGE_STORAGE_KEY = 'cli-proxy-usage-custom-range-v1';
 const DEFAULT_TIME_RANGE: UsageTimeRange = '24h';
-const MAX_CHART_LINES = 9;
 const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: UsageTimeRange; labelKey: string }> = [
   { value: 'all', labelKey: 'usage_stats.range_all' },
   { value: '7h', labelKey: 'usage_stats.range_7h' },
   { value: '24h', labelKey: 'usage_stats.range_24h' },
   { value: '7d', labelKey: 'usage_stats.range_7d' },
+  { value: 'custom', labelKey: 'usage_stats.range_custom' },
 ];
-const HOUR_WINDOW_BY_TIME_RANGE: Record<Exclude<UsageTimeRange, 'all'>, number> = {
-  '7h': 7,
-  '24h': 24,
-  '7d': 7 * 24,
-};
 
 const isUsageTimeRange = (value: unknown): value is UsageTimeRange =>
-  value === '7h' || value === '24h' || value === '7d' || value === 'all';
-
-const normalizeChartLines = (value: unknown, maxLines = MAX_CHART_LINES): string[] => {
-  if (!Array.isArray(value)) {
-    return DEFAULT_CHART_LINES;
-  }
-
-  const filtered = value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, maxLines);
-
-  return filtered.length ? filtered : DEFAULT_CHART_LINES;
-};
-
-const loadChartLines = (): string[] => {
-  try {
-    if (typeof localStorage === 'undefined') {
-      return DEFAULT_CHART_LINES;
-    }
-    const raw = localStorage.getItem(CHART_LINES_STORAGE_KEY);
-    if (!raw) {
-      return DEFAULT_CHART_LINES;
-    }
-    return normalizeChartLines(JSON.parse(raw));
-  } catch {
-    return DEFAULT_CHART_LINES;
-  }
-};
+  value === '7h' ||
+  value === '24h' ||
+  value === '7d' ||
+  value === 'all' ||
+  value === 'custom';
 
 const loadTimeRange = (): UsageTimeRange => {
   try {
@@ -119,11 +80,43 @@ const loadTimeRange = (): UsageTimeRange => {
   }
 };
 
+interface CustomRangeState {
+  start: string;
+  end: string;
+}
+
+const EMPTY_CUSTOM_RANGE: CustomRangeState = { start: '', end: '' };
+
+const loadCustomRange = (): CustomRangeState => {
+  try {
+    if (typeof localStorage === 'undefined') return EMPTY_CUSTOM_RANGE;
+    const raw = localStorage.getItem(CUSTOM_RANGE_STORAGE_KEY);
+    if (!raw) return EMPTY_CUSTOM_RANGE;
+    const parsed = JSON.parse(raw) as Partial<CustomRangeState>;
+    return {
+      start: typeof parsed.start === 'string' ? parsed.start : '',
+      end: typeof parsed.end === 'string' ? parsed.end : '',
+    };
+  } catch {
+    return EMPTY_CUSTOM_RANGE;
+  }
+};
+
+const parseDatetimeLocal = (value: string): number | undefined => {
+  if (!value) return undefined;
+  const ts = new Date(value).getTime();
+  return Number.isFinite(ts) ? ts : undefined;
+};
+
+const toDatetimeLocal = (date: Date): string => {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+};
+
 export function UsagePage() {
   const { t } = useTranslation();
-  const isMobile = useMediaQuery('(max-width: 768px)');
-  const resolvedTheme = useThemeStore((state) => state.resolvedTheme);
-  const isDark = resolvedTheme === 'dark';
   const config = useConfigStore((state) => state.config);
   const openaiCompatibilityConfig = config?.openaiCompatibility;
   const [openaiProvidersWithAuthIndex, setOpenaiProvidersWithAuthIndex] = useState<{
@@ -138,7 +131,6 @@ export function UsagePage() {
     error,
     lastRefreshedAt,
     modelPrices,
-    setModelPrices,
     loadUsage,
     handleExport,
     handleImport,
@@ -150,9 +142,8 @@ export function UsagePage() {
 
   useHeaderRefresh(loadUsage);
 
-  // Chart lines state
-  const [chartLines, setChartLines] = useState<string[]>(loadChartLines);
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
+  const [customRange, setCustomRange] = useState<CustomRangeState>(loadCustomRange);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,26 +180,18 @@ export function UsagePage() {
     [t]
   );
 
+  const customWindow = useMemo<UsageTimeWindow | undefined>(() => {
+    if (timeRange !== 'custom') return undefined;
+    const startMs = parseDatetimeLocal(customRange.start);
+    const endMs = parseDatetimeLocal(customRange.end);
+    if (startMs === undefined && endMs === undefined) return undefined;
+    return { startMs, endMs };
+  }, [timeRange, customRange]);
+
   const filteredUsage = useMemo(
-    () => (usage ? filterUsageByTimeRange(usage, timeRange) : null),
-    [usage, timeRange]
+    () => (usage ? filterUsageByTimeRange(usage, timeRange, Date.now(), customWindow) : null),
+    [usage, timeRange, customWindow]
   );
-  const hourWindowHours = timeRange === 'all' ? undefined : HOUR_WINDOW_BY_TIME_RANGE[timeRange];
-
-  const handleChartLinesChange = useCallback((lines: string[]) => {
-    setChartLines(normalizeChartLines(lines));
-  }, []);
-
-  useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') {
-        return;
-      }
-      localStorage.setItem(CHART_LINES_STORAGE_KEY, JSON.stringify(chartLines));
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [chartLines]);
 
   useEffect(() => {
     try {
@@ -221,26 +204,22 @@ export function UsagePage() {
     }
   }, [timeRange]);
 
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(CUSTOM_RANGE_STORAGE_KEY, JSON.stringify(customRange));
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [customRange]);
+
   const nowMs = lastRefreshedAt?.getTime() ?? 0;
 
-  // Sparklines hook
+  // Sparklines hook (依旧给 StatCards 的迷你趋势用，基于过滤后的数据)
   const { requestsSparkline, tokensSparkline, rpmSparkline, tpmSparkline, costSparkline } =
     useSparklines({ usage: filteredUsage, loading, nowMs });
 
-  // Chart data hook
-  const {
-    requestsPeriod,
-    setRequestsPeriod,
-    tokensPeriod,
-    setTokensPeriod,
-    requestsChartData,
-    tokensChartData,
-    requestsChartOptions,
-    tokensChartOptions,
-  } = useChartData({ usage: filteredUsage, chartLines, isDark, isMobile, hourWindowHours });
-
-  // Derived data
-  const modelNames = useMemo(() => getModelNamesFromUsage(usage), [usage]);
+  // Derived data (全部基于 filteredUsage)
   const apiStats = useMemo(
     () => getApiStats(filteredUsage, modelPrices),
     [filteredUsage, modelPrices]
@@ -250,6 +229,18 @@ export function UsagePage() {
     [filteredUsage, modelPrices]
   );
   const hasPrices = Object.keys(modelPrices).length > 0;
+
+  const handleSetCustomToNow = useCallback(
+    (field: 'start' | 'end') => {
+      const now = new Date();
+      setCustomRange((prev) => ({ ...prev, [field]: toDatetimeLocal(now) }));
+    },
+    []
+  );
+
+  const handleClearCustom = useCallback(() => {
+    setCustomRange(EMPTY_CUSTOM_RANGE);
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -317,6 +308,56 @@ export function UsagePage() {
         </div>
       </div>
 
+      {timeRange === 'custom' && (
+        <div className={styles.customRangePanel}>
+          <label className={styles.customRangeField}>
+            <span className={styles.customRangeLabel}>{t('usage_stats.range_custom_start')}</span>
+            <input
+              type="datetime-local"
+              value={customRange.start}
+              onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))}
+              className={styles.customRangeInput}
+              max={customRange.end || undefined}
+            />
+            <button
+              type="button"
+              className={styles.customRangeMiniBtn}
+              onClick={() => handleSetCustomToNow('start')}
+            >
+              {t('usage_stats.range_custom_now')}
+            </button>
+          </label>
+          <label className={styles.customRangeField}>
+            <span className={styles.customRangeLabel}>{t('usage_stats.range_custom_end')}</span>
+            <input
+              type="datetime-local"
+              value={customRange.end}
+              onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))}
+              className={styles.customRangeInput}
+              min={customRange.start || undefined}
+            />
+            <button
+              type="button"
+              className={styles.customRangeMiniBtn}
+              onClick={() => handleSetCustomToNow('end')}
+            >
+              {t('usage_stats.range_custom_now')}
+            </button>
+          </label>
+          <button
+            type="button"
+            className={styles.customRangeMiniBtn}
+            onClick={handleClearCustom}
+            disabled={!customRange.start && !customRange.end}
+          >
+            {t('usage_stats.range_custom_clear')}
+          </button>
+          {!customRange.start && !customRange.end && (
+            <span className={styles.customRangeHint}>{t('usage_stats.range_custom_hint')}</span>
+          )}
+        </div>
+      )}
+
       {error && <div className={styles.errorBox}>{error}</div>}
 
       {/* Stats Overview Cards */}
@@ -334,58 +375,16 @@ export function UsagePage() {
         }}
       />
 
-      {/* Chart Line Selection */}
-      <ChartLineSelector
-        chartLines={chartLines}
-        modelNames={modelNames}
-        maxLines={MAX_CHART_LINES}
-        onChange={handleChartLinesChange}
-      />
-
-      {/* Service Health */}
-      <ServiceHealthCard usage={usage} loading={loading} />
-
-      {/* Charts Grid */}
-      <div className={styles.chartsGrid}>
-        <UsageChart
-          title={t('usage_stats.requests_trend')}
-          period={requestsPeriod}
-          onPeriodChange={setRequestsPeriod}
-          chartData={requestsChartData}
-          chartOptions={requestsChartOptions}
-          loading={loading}
-          isMobile={isMobile}
-          emptyText={t('usage_stats.no_data')}
-        />
-        <UsageChart
-          title={t('usage_stats.tokens_trend')}
-          period={tokensPeriod}
-          onPeriodChange={setTokensPeriod}
-          chartData={tokensChartData}
-          chartOptions={tokensChartOptions}
-          loading={loading}
-          isMobile={isMobile}
-          emptyText={t('usage_stats.no_data')}
-        />
-      </div>
-
-      {/* Token Breakdown Chart */}
-      <TokenBreakdownChart
+      {/* Auth 文件统计：请求/成功/失败/Tokens/花费 */}
+      <CredentialStatsCard
         usage={filteredUsage}
         loading={loading}
-        isDark={isDark}
-        isMobile={isMobile}
-        hourWindowHours={hourWindowHours}
-      />
-
-      {/* Cost Trend Chart */}
-      <CostTrendChart
-        usage={filteredUsage}
-        loading={loading}
-        isDark={isDark}
-        isMobile={isMobile}
         modelPrices={modelPrices}
-        hourWindowHours={hourWindowHours}
+        geminiKeys={config?.geminiApiKeys || []}
+        claudeConfigs={config?.claudeApiKeys || []}
+        codexConfigs={config?.codexApiKeys || []}
+        vertexConfigs={config?.vertexApiKeys || []}
+        openaiProviders={openaiProvidersForUsage}
       />
 
       {/* Details Grid */}
@@ -402,24 +401,6 @@ export function UsagePage() {
         codexConfigs={config?.codexApiKeys || []}
         vertexConfigs={config?.vertexApiKeys || []}
         openaiProviders={openaiProvidersForUsage}
-      />
-
-      {/* Credential Stats */}
-      <CredentialStatsCard
-        usage={filteredUsage}
-        loading={loading}
-        geminiKeys={config?.geminiApiKeys || []}
-        claudeConfigs={config?.claudeApiKeys || []}
-        codexConfigs={config?.codexApiKeys || []}
-        vertexConfigs={config?.vertexApiKeys || []}
-        openaiProviders={openaiProvidersForUsage}
-      />
-
-      {/* Price Settings */}
-      <PriceSettingsCard
-        modelNames={modelNames}
-        modelPrices={modelPrices}
-        onPricesChange={setModelPrices}
       />
     </div>
   );

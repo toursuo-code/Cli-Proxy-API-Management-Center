@@ -110,16 +110,74 @@ export interface ModelStatsSummary {
   latencySampleCount: number;
 }
 
-export type UsageTimeRange = '7h' | '24h' | '7d' | 'all';
+export type UsageTimeRange = '7h' | '24h' | '7d' | 'all' | 'custom';
+
+export interface UsageTimeWindow {
+  /** 起始时间（毫秒，含）。undefined 表示不限。 */
+  startMs?: number;
+  /** 结束时间（毫秒，含）。undefined 表示不限。 */
+  endMs?: number;
+}
 
 const TOKENS_PER_PRICE_UNIT = 1_000_000;
-const MODEL_PRICE_STORAGE_KEY = 'cli-proxy-model-prices-v2';
 const USAGE_ENDPOINT_METHOD_REGEX = /^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(\S+)/i;
-const USAGE_TIME_RANGE_MS: Record<Exclude<UsageTimeRange, 'all'>, number> = {
+
+/**
+ * 内置模型价格（单位：美元/1M tokens）。
+ * 数据来源：OpenAI 官方 API Pricing（platform.openai.com / developers.openai.com）。
+ * 不允许用户修改。如需更新，请直接调整本表。
+ */
+export const BUILTIN_MODEL_PRICES: Readonly<Record<string, ModelPrice>> = Object.freeze({
+  'gpt-5.2': { prompt: 1.75, completion: 14, cache: 0.175 },
+  'gpt-5.3-codex': { prompt: 1.75, completion: 14, cache: 0.175 },
+  'gpt-5.4': { prompt: 2.5, completion: 15, cache: 0.25 },
+  'gpt-5.4-mini': { prompt: 0.75, completion: 4.5, cache: 0.075 },
+  'gpt-5.5': { prompt: 5, completion: 30, cache: 0.5 },
+});
+
+/**
+ * 返回内置模型价格的浅拷贝，避免调用方误改 frozen 对象。
+ */
+export function getBuiltinModelPrices(): Record<string, ModelPrice> {
+  return { ...BUILTIN_MODEL_PRICES };
+}
+const USAGE_TIME_RANGE_MS: Record<Exclude<UsageTimeRange, 'all' | 'custom'>, number> = {
   '7h': 7 * 60 * 60 * 1000,
   '24h': 24 * 60 * 60 * 1000,
   '7d': 7 * 24 * 60 * 60 * 1000,
 };
+
+/**
+ * 把时间范围解析为绝对 [startMs, endMs] 窗口。
+ * - 'all' → 不限制
+ * - 'custom' → 使用传入的 customWindow
+ * - 其他预设 → 以 nowMs 为终点回溯固定窗口
+ */
+export function resolveUsageTimeWindow(
+  range: UsageTimeRange,
+  nowMs: number = Date.now(),
+  customWindow?: UsageTimeWindow
+): UsageTimeWindow | null {
+  if (range === 'all') {
+    return null;
+  }
+  if (range === 'custom') {
+    if (!customWindow) return null;
+    const startMs =
+      typeof customWindow.startMs === 'number' && Number.isFinite(customWindow.startMs)
+        ? customWindow.startMs
+        : undefined;
+    const endMs =
+      typeof customWindow.endMs === 'number' && Number.isFinite(customWindow.endMs)
+        ? customWindow.endMs
+        : undefined;
+    if (startMs === undefined && endMs === undefined) return null;
+    return { startMs, endMs };
+  }
+  const rangeMs = USAGE_TIME_RANGE_MS[range];
+  if (!Number.isFinite(rangeMs) || rangeMs <= 0) return null;
+  return { startMs: nowMs - rangeMs, endMs: nowMs };
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -177,9 +235,11 @@ const toUsageSummaryFields = (summary: UsageSummary) => ({
 export function filterUsageByTimeRange<T>(
   usageData: T,
   range: UsageTimeRange,
-  nowMs: number = Date.now()
+  nowMs: number = Date.now(),
+  customWindow?: UsageTimeWindow
 ): T {
-  if (range === 'all') {
+  const window = resolveUsageTimeWindow(range, nowMs, customWindow);
+  if (!window) {
     return usageData;
   }
 
@@ -189,12 +249,17 @@ export function filterUsageByTimeRange<T>(
     return usageData;
   }
 
-  const rangeMs = USAGE_TIME_RANGE_MS[range];
-  if (!Number.isFinite(rangeMs) || rangeMs <= 0) {
+  const windowStart =
+    typeof window.startMs === 'number' && Number.isFinite(window.startMs)
+      ? window.startMs
+      : Number.NEGATIVE_INFINITY;
+  const windowEnd =
+    typeof window.endMs === 'number' && Number.isFinite(window.endMs)
+      ? window.endMs
+      : Number.POSITIVE_INFINITY;
+  if (windowStart > windowEnd) {
     return usageData;
   }
-
-  const windowStart = nowMs - rangeMs;
   const filteredApis: Record<string, unknown> = {};
   const totalSummary = createUsageSummary();
 
@@ -227,7 +292,7 @@ export function filterUsageByTimeRange<T>(
           return;
         }
         const timestamp = parseTimestampMs(detailRecord.timestamp);
-        if (Number.isNaN(timestamp) || timestamp < windowStart || timestamp > nowMs) {
+        if (Number.isNaN(timestamp) || timestamp < windowStart || timestamp > windowEnd) {
           return;
         }
 
@@ -850,70 +915,13 @@ export function calculateTotalCost(
 }
 
 /**
- * 从 localStorage 加载模型价格
+ * 加载模型价格。
+ *
+ * 价格已内置，不再支持用户自定义；本函数仅返回 {@link BUILTIN_MODEL_PRICES} 的浅拷贝，
+ * 以便保持与历史调用方的签名兼容。
  */
 export function loadModelPrices(): Record<string, ModelPrice> {
-  try {
-    if (typeof localStorage === 'undefined') {
-      return {};
-    }
-    const raw = localStorage.getItem(MODEL_PRICE_STORAGE_KEY);
-    if (!raw) {
-      return {};
-    }
-    const parsed: unknown = JSON.parse(raw);
-    if (!isRecord(parsed)) {
-      return {};
-    }
-    const normalized: Record<string, ModelPrice> = {};
-    Object.entries(parsed).forEach(([model, price]: [string, unknown]) => {
-      if (!model) return;
-      const priceRecord = isRecord(price) ? price : null;
-      const promptRaw = Number(priceRecord?.prompt);
-      const completionRaw = Number(priceRecord?.completion);
-      const cacheRaw = Number(priceRecord?.cache);
-
-      if (
-        !Number.isFinite(promptRaw) &&
-        !Number.isFinite(completionRaw) &&
-        !Number.isFinite(cacheRaw)
-      ) {
-        return;
-      }
-
-      const prompt = Number.isFinite(promptRaw) && promptRaw >= 0 ? promptRaw : 0;
-      const completion = Number.isFinite(completionRaw) && completionRaw >= 0 ? completionRaw : 0;
-      const cache =
-        Number.isFinite(cacheRaw) && cacheRaw >= 0
-          ? cacheRaw
-          : Number.isFinite(promptRaw) && promptRaw >= 0
-            ? promptRaw
-            : prompt;
-
-      normalized[model] = {
-        prompt,
-        completion,
-        cache,
-      };
-    });
-    return normalized;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * 保存模型价格到 localStorage
- */
-export function saveModelPrices(prices: Record<string, ModelPrice>): void {
-  try {
-    if (typeof localStorage === 'undefined') {
-      return;
-    }
-    localStorage.setItem(MODEL_PRICE_STORAGE_KEY, JSON.stringify(prices));
-  } catch {
-    console.warn('保存模型价格失败');
-  }
+  return getBuiltinModelPrices();
 }
 
 /**

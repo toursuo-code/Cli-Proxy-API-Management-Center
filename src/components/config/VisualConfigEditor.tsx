@@ -716,13 +716,6 @@ export function VisualConfigEditor({
                   onChange={(e) => onChange({ rmSecretKey: e.target.value })}
                   disabled={disabled}
                 />
-                <Input
-                  label={t('config_management.visual.sections.remote.panel_repo')}
-                  placeholder="https://github.com/router-for-me/Cli-Proxy-API-Management-Center"
-                  value={values.rmPanelRepo}
-                  onChange={(e) => onChange({ rmPanelRepo: e.target.value })}
-                  disabled={disabled}
-                />
               </SectionGrid>
             </SectionStack>
           </ConfigSection>

@@ -1091,8 +1091,7 @@
           "disable_panel": "Отключить панель",
           "disable_panel_desc": "Отключить встроенную веб-панель управления",
           "secret_key": "Ключ управления",
-          "secret_key_placeholder": "Задайте ключ управления",
-          "panel_repo": "Репозиторий панели"
+          "secret_key_placeholder": "Задайте ключ управления"
         },
         "auth": {
           "title": "Настройки аутентификации",
@@ -1240,6 +1239,7 @@
     "refresh_files": "Обновить файлы авторизации",
     "refresh_files_and_quota": "Обновить файлы и квоты",
     "refresh_all_credentials": "Обновить все учётные данные",
+    "refresh_credential": "Обновить эту учётную запись",
     "card_idle_hint": "Используйте кнопку «Обновить все учётные данные» сверху, чтобы загрузить актуальные данные по квотам."
   },
   "system_info": {
@@ -1259,17 +1259,6 @@
     "models_empty": "Сервис /models не вернул модели",
     "models_error": "Не удалось загрузить список моделей",
     "models_count": "Доступно моделей: {{count}}",
-    "version_check_title": "Проверка обновлений",
-    "version_check_desc": "Вызовите эндпоинт /latest-version, чтобы сравнить с версией сервера и узнать о доступных обновлениях.",
-    "version_current_label": "Текущая версия",
-    "version_latest_label": "Последняя версия",
-    "version_check_button": "Проверить обновления",
-    "version_check_idle": "Нажмите, чтобы проверить обновления",
-    "version_checking": "Поиск последней версии...",
-    "version_update_available": "Доступно обновление: {{version}}",
-    "version_is_latest": "Установлена последняя версия",
-    "version_check_error": "Не удалось проверить обновление",
-    "version_current_missing": "Версия сервера недоступна; сравнение невозможно",
     "version_unknown": "Неизвестно",
     "quick_links_title": "Быстрые ссылки",
     "quick_links_desc": "Доступ к репозиториям проекта и документации для помощи и обновлений.",
@@ -1401,6 +1390,12 @@
     "range_7h": "Последние 7 часов",
     "range_24h": "Последние 24 часа",
     "range_7d": "Последние 7 дней",
+    "range_custom": "Произвольный период",
+    "range_custom_start": "Начало",
+    "range_custom_end": "Конец",
+    "range_custom_now": "Сейчас",
+    "range_custom_clear": "Очистить",
+    "range_custom_hint": "Укажите время начала и/или окончания для фильтра",
     "filter_all": "Все",
     "clear_filters": "Сбросить фильтры",
     "refresh": "Обновить",
