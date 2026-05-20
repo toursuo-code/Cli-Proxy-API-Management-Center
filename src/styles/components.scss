@@ -188,12 +188,21 @@ textarea {
 .notification-container {
   position: fixed;
   top: $spacing-lg;
-  right: $spacing-lg;
   display: flex;
   flex-direction: column;
   gap: $spacing-sm;
   z-index: $z-notification;
   max-width: 360px;
+
+  &--top-right {
+    right: $spacing-lg;
+  }
+
+  &--top-center {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(360px, calc(100vw - #{$spacing-lg * 2}));
+  }
 }
 
 @keyframes notification-enter {

@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNotificationStore } from '@/stores';
 import { IconX } from '@/components/ui/icons';
-import type { Notification } from '@/types';
+import type { Notification, NotificationPosition } from '@/types';
 
 interface AnimatedNotification extends Notification {
   isExiting?: boolean;
 }
 
 const ANIMATION_DURATION = 300; // ms
+const NOTIFICATION_POSITIONS: NotificationPosition[] = ['top-right', 'top-center'];
 
 export function NotificationContainer() {
   const { t } = useTranslation();
@@ -59,23 +60,38 @@ export function NotificationContainer() {
   if (!animatedNotifications.length) return null;
 
   return (
-    <div className="notification-container">
-      {animatedNotifications.map((notification) => (
-        <div
-          key={notification.id}
-          className={`notification ${notification.type} ${notification.isExiting ? 'exiting' : 'entering'}`}
-        >
-          <div className="message">{notification.message}</div>
-          <button
-            type="button"
-            className="close-btn"
-            onClick={() => handleClose(notification.id)}
-            aria-label={t('common.close')}
+    <>
+      {NOTIFICATION_POSITIONS.map((position) => {
+        const positionNotifications = animatedNotifications.filter(
+          (notification) => (notification.position ?? 'top-right') === position
+        );
+
+        if (!positionNotifications.length) return null;
+
+        return (
+          <div
+            key={position}
+            className={`notification-container notification-container--${position}`}
           >
-            <IconX size={16} />
-          </button>
-        </div>
-      ))}
-    </div>
+            {positionNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`notification ${notification.type} ${notification.isExiting ? 'exiting' : 'entering'}`}
+              >
+                <div className="message">{notification.message}</div>
+                <button
+                  type="button"
+                  className="close-btn"
+                  onClick={() => handleClose(notification.id)}
+                  aria-label={t('common.close')}
+                >
+                  <IconX size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
   );
 }

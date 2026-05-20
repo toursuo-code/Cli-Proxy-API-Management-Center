@@ -472,7 +472,7 @@ export function MainLayout() {
       );
       return;
     }
-    showNotification(t('notification.data_refreshed'), 'success');
+    showNotification(t('notification.data_refreshed'), 'success', undefined, 'top-center');
   };
   const mobileSidebarToggleLabel = sidebarOpen
     ? t('sidebar.toggle_collapse', { defaultValue: 'Close navigation' })

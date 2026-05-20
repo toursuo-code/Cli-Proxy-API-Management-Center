@@ -141,6 +141,10 @@ export const BUILTIN_MODEL_PRICES: Readonly<Record<string, ModelPrice>> = Object
 export function getBuiltinModelPrices(): Record<string, ModelPrice> {
   return { ...BUILTIN_MODEL_PRICES };
 }
+
+const BUILTIN_MODEL_PRICE_KEYS = Object.freeze(
+  Object.keys(BUILTIN_MODEL_PRICES).sort((a, b) => b.length - a.length)
+);
 const USAGE_TIME_RANGE_MS: Record<Exclude<UsageTimeRange, 'all' | 'custom'>, number> = {
   '7h': 7 * 60 * 60 * 1000,
   '24h': 24 * 60 * 60 * 1000,
@@ -872,7 +876,7 @@ export function calculateCost(
   modelPrices: Record<string, ModelPrice>
 ): number {
   const modelName = detail.__modelName || '';
-  const price = modelPrices[modelName];
+  const price = resolveModelPrice(modelName, modelPrices);
   if (!price) {
     return 0;
   }
@@ -890,7 +894,11 @@ export function calculateCost(
     Number.isFinite(rawCachedTokensPrimary) ? Math.max(rawCachedTokensPrimary, 0) : 0,
     Number.isFinite(rawCachedTokensAlternate) ? Math.max(rawCachedTokensAlternate, 0) : 0
   );
+
+  // OpenAI usage 中 cached_tokens 是 input_tokens 的子集，需先从普通输入里扣除。
   const promptTokens = Math.max(inputTokens - cachedTokens, 0);
+
+  // reasoning_tokens 是 output_tokens 的子集，官方按输出 tokens 计费，不应重复累加收费。
 
   const promptCost = (promptTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.prompt) || 0);
   const cachedCost = (cachedTokens / TOKENS_PER_PRICE_UNIT) * (Number(price.cache) || 0);
@@ -922,6 +930,32 @@ export function calculateTotalCost(
  */
 export function loadModelPrices(): Record<string, ModelPrice> {
   return getBuiltinModelPrices();
+}
+
+function resolveModelPrice(
+  modelName: string,
+  modelPrices: Record<string, ModelPrice>
+): ModelPrice | null {
+  const normalized = modelName.trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  const direct = modelPrices[normalized];
+  if (direct) {
+    return direct;
+  }
+
+  for (const key of BUILTIN_MODEL_PRICE_KEYS) {
+    if (normalized === key) {
+      return modelPrices[key] ?? BUILTIN_MODEL_PRICES[key];
+    }
+    if (normalized.startsWith(`${key}-`)) {
+      return modelPrices[key] ?? BUILTIN_MODEL_PRICES[key];
+    }
+  }
+
+  return null;
 }
 
 /**

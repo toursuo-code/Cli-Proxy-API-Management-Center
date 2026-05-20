@@ -24,9 +24,6 @@ export type { ApiDetailsCardProps } from './ApiDetailsCard';
 export { ModelStatsCard } from './ModelStatsCard';
 export type { ModelStatsCardProps, ModelStat } from './ModelStatsCard';
 
-export { PriceSettingsCard } from './PriceSettingsCard';
-export type { PriceSettingsCardProps } from './PriceSettingsCard';
-
 export { CredentialStatsCard } from './CredentialStatsCard';
 export type { CredentialStatsCardProps } from './CredentialStatsCard';
 

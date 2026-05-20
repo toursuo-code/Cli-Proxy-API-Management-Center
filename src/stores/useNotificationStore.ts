@@ -5,7 +5,7 @@
 
 import { create } from 'zustand';
 import type { ReactNode } from 'react';
-import type { Notification, NotificationType } from '@/types';
+import type { Notification, NotificationPosition, NotificationType } from '@/types';
 import { generateId } from '@/utils/helpers';
 import { NOTIFICATION_DURATION_MS } from '@/utils/constants';
 
@@ -26,7 +26,12 @@ interface NotificationState {
     isLoading: boolean;
     options: ConfirmationOptions | null;
   };
-  showNotification: (message: string, type?: NotificationType, duration?: number) => void;
+  showNotification: (
+    message: string,
+    type?: NotificationType,
+    duration?: number,
+    position?: NotificationPosition
+  ) => void;
   removeNotification: (id: string) => void;
   clearAll: () => void;
   showConfirmation: (options: ConfirmationOptions) => void;
@@ -42,13 +47,19 @@ export const useNotificationStore = create<NotificationState>((set) => ({
     options: null
   },
 
-  showNotification: (message, type = 'info', duration = NOTIFICATION_DURATION_MS) => {
+  showNotification: (
+    message,
+    type = 'info',
+    duration = NOTIFICATION_DURATION_MS,
+    position = 'top-right'
+  ) => {
     const id = generateId();
     const notification: Notification = {
       id,
       message,
       type,
-      duration
+      duration,
+      position
     };
 
     set((state) => ({
