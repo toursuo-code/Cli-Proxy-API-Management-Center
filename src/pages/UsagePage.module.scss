@@ -49,55 +49,121 @@
 }
 
 .customRangePanel {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
   border: 1px solid var(--border-color);
-  background: var(--bg-secondary, var(--bg-primary));
-  border-radius: $radius-md;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+    var(--bg-secondary, var(--bg-primary));
+  border-radius: $radius-lg;
+  box-shadow: var(--shadow);
 }
 
-.customRangeField {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
+.customRangeFieldCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(127, 127, 127, 0.14);
+  border-radius: $radius-md;
+  background: var(--bg-primary);
+  min-width: 0;
+}
+
+.customRangeFieldHeader {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.customRangeFieldTitleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .customRangeLabel {
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.customRangeMetaText {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+}
+
+.customRangeInputRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.customRangeToggleRow {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--text-secondary);
 }
 
 .customRangeInput {
   font-size: 12px;
-  padding: 4px 8px;
+  min-height: 40px;
+  padding: 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: $radius-sm;
   background: var(--bg-primary);
   color: var(--text-primary);
-  min-width: 180px;
+  min-width: 0;
+  flex: 1 1 0;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
 
   &:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba($primary-color, 0.14);
   }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.customRangeTimeInput {
+  flex: 0 0 118px;
 }
 
 .customRangeMiniBtn {
   font-size: 11px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border: 1px solid rgba(127, 127, 127, 0.18);
   border-radius: $radius-sm;
-  background: var(--bg-primary);
+  background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: var(--bg-tertiary, var(--bg-primary));
+    background: rgba($primary-color, 0.08);
+    border-color: rgba($primary-color, 0.28);
     color: var(--text-primary);
   }
 
@@ -107,10 +173,72 @@
   }
 }
 
+.customRangeTextBtn {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, opacity 0.15s ease;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.customRangeActions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -2px;
+}
+
 .customRangeHint {
+  grid-column: 1 / -1;
   font-size: 11px;
   color: var(--text-tertiary);
   font-style: italic;
+}
+
+@include mobile {
+  .customRangePanel {
+    grid-template-columns: 1fr;
+  }
+
+  .customRangeFieldCard {
+    padding: 12px;
+  }
+
+  .customRangeInputRow {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .customRangeToggleRow {
+    width: 100%;
+  }
+
+  .customRangeInput {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+
+  .customRangeTimeInput {
+    flex-basis: 140px;
+  }
+
+  .customRangeFieldHeader {
+    align-items: center;
+  }
 }
 
 .pageTitle {

@@ -53,6 +53,10 @@ export type AuthFileCacheResetResult = {
   current_reset_at?: number;
   next_reset_at?: number;
 };
+export type AuthFileMySQLSyncResult = {
+  written: number;
+  deleted: number;
+};
 
 export const AUTH_FILE_INVALID_JSON_OBJECT_ERROR = 'AUTH_FILE_INVALID_JSON_OBJECT';
 
@@ -422,6 +426,9 @@ export const authFilesApi = {
 
   resetCacheMarker: (force = false) =>
     apiClient.post<AuthFileCacheResetResult>('/auth-files/cache-reset', { force }),
+
+  syncMySQLAuthFiles: () =>
+    apiClient.post<AuthFileMySQLSyncResult>('/auth-files/mysql-sync', {}),
 
   uploadFiles: async (files: File[]): Promise<AuthFileBatchUploadResult> => {
     const requestedNames = files.map((file) => file.name);

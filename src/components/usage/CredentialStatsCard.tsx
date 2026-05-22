@@ -53,6 +53,7 @@ export function CredentialStatsCard({
 }: CredentialStatsCardProps) {
   const { t } = useTranslation();
   const [authFileMap, setAuthFileMap] = useState<Map<string, CredentialInfo>>(new Map());
+  const [authFilesStatus, setAuthFilesStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
     let cancelled = false;
@@ -63,7 +64,10 @@ export function CredentialStatsCard({
         if (cancelled) return;
 
         const files = Array.isArray(res) ? res : (res as { files?: AuthFileItem[] })?.files;
-        if (!Array.isArray(files)) return;
+        if (!Array.isArray(files)) {
+          setAuthFilesStatus('error');
+          return;
+        }
 
         const map = new Map<string, CredentialInfo>();
         files.forEach((file) => {
@@ -76,8 +80,12 @@ export function CredentialStatsCard({
           });
         });
         setAuthFileMap(map);
+        setAuthFilesStatus('ready');
       })
-      .catch(() => {});
+      .catch(() => {
+        if (cancelled) return;
+        setAuthFilesStatus('error');
+      });
 
     return () => {
       cancelled = true;
@@ -104,6 +112,17 @@ export function CredentialStatsCard({
     const rowMap = new Map<string, CredentialRow>();
 
     collectUsageDetails(usage).forEach((detail) => {
+      const authIndexKey = normalizeAuthIndex(detail.auth_index);
+      const shouldHideDeletedAuth =
+        authFilesStatus === 'ready' &&
+        authIndexKey !== null &&
+        !authFileMap.has(authIndexKey) &&
+        !sourceInfoMap.byAuthIndex.has(authIndexKey);
+
+      if (shouldHideDeletedAuth) {
+        return;
+      }
+
       const sourceInfo = resolveSourceDisplay(
         detail.source ?? '',
         detail.auth_index,
@@ -142,11 +161,13 @@ export function CredentialStatsCard({
     });
 
     return Array.from(rowMap.values()).sort((a, b) => b.total - a.total);
-  }, [authFileMap, hasPrices, modelPrices, sourceInfoMap, usage]);
+  }, [authFileMap, authFilesStatus, hasPrices, modelPrices, sourceInfoMap, usage]);
+
+  const isCardLoading = loading || (Boolean(usage) && authFilesStatus === 'loading');
 
   return (
     <Card title={t('usage_stats.credential_stats')} className={styles.detailsFixedCard}>
-      {loading ? (
+      {isCardLoading ? (
         <div className={styles.hint}>{t('common.loading')}</div>
       ) : rows.length > 0 ? (
         <div className={styles.detailsScroll}>

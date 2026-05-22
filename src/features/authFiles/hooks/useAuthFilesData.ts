@@ -32,6 +32,7 @@ export type UseAuthFilesDataResult = {
   deleting: string | null;
   deletingAll: boolean;
   cacheResetting: boolean;
+  mysqlSyncing: boolean;
   statusUpdating: Record<string, boolean>;
   batchStatusUpdating: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -42,6 +43,7 @@ export type UseAuthFilesDataResult = {
   handleDeleteAll: (options: DeleteAllOptions) => void;
   handleDownload: (name: string) => Promise<void>;
   handleCacheMarkerReset: () => void;
+  handleMySQLAuthSync: () => void;
   handleStatusToggle: (item: AuthFileItem, enabled: boolean) => Promise<void>;
   toggleSelect: (name: string) => void;
   selectAllVisible: (visibleFiles: AuthFileItem[]) => void;
@@ -63,6 +65,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [cacheResetting, setCacheResetting] = useState(false);
+  const [mysqlSyncing, setMySQLSyncing] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
   const [batchStatusUpdating, setBatchStatusUpdating] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -225,6 +228,39 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
       },
     });
   }, [cacheResetting, showConfirmation, showNotification, t]);
+
+  const handleMySQLAuthSync = useCallback(() => {
+    if (mysqlSyncing) return;
+
+    showConfirmation({
+      title: t('auth_files.mysql_sync_confirm_title'),
+      message: t('auth_files.mysql_sync_confirm_message'),
+      variant: 'danger',
+      confirmText: t('common.confirm'),
+      onConfirm: async () => {
+        setMySQLSyncing(true);
+        try {
+          const result = await authFilesApi.syncMySQLAuthFiles();
+          await loadFiles();
+          showNotification(
+            t('auth_files.mysql_sync_success', {
+              written: result.written ?? 0,
+              deleted: result.deleted ?? 0,
+            }),
+            'success'
+          );
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : t('common.unknown_error');
+          showNotification(
+            t('auth_files.mysql_sync_failed', { message: errorMessage }),
+            'error'
+          );
+        } finally {
+          setMySQLSyncing(false);
+        }
+      },
+    });
+  }, [loadFiles, mysqlSyncing, showConfirmation, showNotification, t]);
 
   const handleUploadClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -691,6 +727,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     deleting,
     deletingAll,
     cacheResetting,
+    mysqlSyncing,
     statusUpdating,
     batchStatusUpdating,
     fileInputRef,
@@ -701,6 +738,7 @@ export function useAuthFilesData(): UseAuthFilesDataResult {
     handleDeleteAll,
     handleDownload,
     handleCacheMarkerReset,
+    handleMySQLAuthSync,
     handleStatusToggle,
     toggleSelect,
     selectAllVisible,

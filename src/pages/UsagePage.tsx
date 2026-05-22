@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Select } from '@/components/ui/Select';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { providersApi } from '@/services/api';
 import { useConfigStore } from '@/stores';
@@ -35,6 +36,13 @@ import {
   type UsageTimeRange,
   type UsageTimeWindow,
 } from '@/utils/usage';
+import {
+  buildCustomRangePointFromDate,
+  EMPTY_CUSTOM_RANGE,
+  parseStoredCustomRange,
+  toCustomRangeTimestamp,
+  type CustomRangeState,
+} from '@/utils/usageCustomRange';
 import styles from './UsagePage.module.scss';
 
 // Register Chart.js components
@@ -80,40 +88,16 @@ const loadTimeRange = (): UsageTimeRange => {
   }
 };
 
-interface CustomRangeState {
-  start: string;
-  end: string;
-}
-
-const EMPTY_CUSTOM_RANGE: CustomRangeState = { start: '', end: '' };
-
 const loadCustomRange = (): CustomRangeState => {
   try {
     if (typeof localStorage === 'undefined') return EMPTY_CUSTOM_RANGE;
-    const raw = localStorage.getItem(CUSTOM_RANGE_STORAGE_KEY);
-    if (!raw) return EMPTY_CUSTOM_RANGE;
-    const parsed = JSON.parse(raw) as Partial<CustomRangeState>;
-    return {
-      start: typeof parsed.start === 'string' ? parsed.start : '',
-      end: typeof parsed.end === 'string' ? parsed.end : '',
-    };
+    return parseStoredCustomRange(localStorage.getItem(CUSTOM_RANGE_STORAGE_KEY));
   } catch {
     return EMPTY_CUSTOM_RANGE;
   }
 };
 
-const parseDatetimeLocal = (value: string): number | undefined => {
-  if (!value) return undefined;
-  const ts = new Date(value).getTime();
-  return Number.isFinite(ts) ? ts : undefined;
-};
-
-const toDatetimeLocal = (date: Date): string => {
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours()
-  )}:${pad(date.getMinutes())}`;
-};
+type PickerInputElement = HTMLInputElement & { showPicker?: () => void };
 
 export function UsagePage() {
   const { t } = useTranslation();
@@ -144,6 +128,11 @@ export function UsagePage() {
 
   const [timeRange, setTimeRange] = useState<UsageTimeRange>(loadTimeRange);
   const [customRange, setCustomRange] = useState<CustomRangeState>(loadCustomRange);
+  const [initialFilterAnchorMs] = useState(() => Date.now());
+  const startDateInputRef = useRef<HTMLInputElement | null>(null);
+  const startTimeInputRef = useRef<HTMLInputElement | null>(null);
+  const endDateInputRef = useRef<HTMLInputElement | null>(null);
+  const endTimeInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,17 +169,25 @@ export function UsagePage() {
     [t]
   );
 
+  const filterAnchorMs = lastRefreshedAt?.getTime() ?? initialFilterAnchorMs;
+  const effectiveEndPoint = useMemo(
+    () => buildCustomRangePointFromDate(new Date(filterAnchorMs)),
+    [filterAnchorMs]
+  );
+
   const customWindow = useMemo<UsageTimeWindow | undefined>(() => {
     if (timeRange !== 'custom') return undefined;
-    const startMs = parseDatetimeLocal(customRange.start);
-    const endMs = parseDatetimeLocal(customRange.end);
+    const startMs = toCustomRangeTimestamp(customRange.start, 'start');
+    const endMs = customRange.useCurrentEnd
+      ? filterAnchorMs
+      : toCustomRangeTimestamp(customRange.end, 'end');
     if (startMs === undefined && endMs === undefined) return undefined;
     return { startMs, endMs };
-  }, [timeRange, customRange]);
+  }, [customRange, filterAnchorMs, timeRange]);
 
   const filteredUsage = useMemo(
-    () => (usage ? filterUsageByTimeRange(usage, timeRange, Date.now(), customWindow) : null),
-    [usage, timeRange, customWindow]
+    () => (usage ? filterUsageByTimeRange(usage, timeRange, filterAnchorMs, customWindow) : null),
+    [customWindow, filterAnchorMs, timeRange, usage]
   );
 
   useEffect(() => {
@@ -232,14 +229,59 @@ export function UsagePage() {
 
   const handleSetCustomToNow = useCallback(
     (field: 'start' | 'end') => {
-      const now = new Date();
-      setCustomRange((prev) => ({ ...prev, [field]: toDatetimeLocal(now) }));
+      setCustomRange((prev) => ({
+        ...prev,
+        [field]: buildCustomRangePointFromDate(new Date()),
+      }));
+    },
+    []
+  );
+
+  const handleUseCurrentEndChange = useCallback(
+    (checked: boolean) => {
+      setCustomRange((prev) => ({
+        ...prev,
+        useCurrentEnd: checked,
+        ...(!checked && !prev.end.date ? { end: buildCustomRangePointFromDate(new Date()) } : {}),
+      }));
     },
     []
   );
 
   const handleClearCustom = useCallback(() => {
     setCustomRange(EMPTY_CUSTOM_RANGE);
+  }, []);
+
+  const handleCustomRangePartChange = useCallback(
+    (field: 'start' | 'end', part: 'date' | 'time', value: string) => {
+      setCustomRange((prev) => ({
+        ...prev,
+        [field]: {
+          ...prev[field],
+          [part]: value,
+          ...(part === 'date' && !value ? { time: '' } : {}),
+        },
+      }));
+    },
+    []
+  );
+
+  const isSameCustomRangeDate =
+    Boolean(customRange.start.date) &&
+    customRange.start.date ===
+      (customRange.useCurrentEnd ? effectiveEndPoint.date : customRange.end.date);
+
+  const resolvedEndPoint = customRange.useCurrentEnd ? effectiveEndPoint : customRange.end;
+
+  const openNativePicker = useCallback((ref: RefObject<HTMLInputElement | null>) => {
+    const input = ref.current as PickerInputElement | null;
+    if (!input || input.disabled) return;
+    input.focus();
+    try {
+      input.showPicker?.();
+    } catch {
+      // Fallback to focus only when showPicker is unsupported or blocked.
+    }
   }, []);
 
   return (
@@ -310,49 +352,119 @@ export function UsagePage() {
 
       {timeRange === 'custom' && (
         <div className={styles.customRangePanel}>
-          <label className={styles.customRangeField}>
-            <span className={styles.customRangeLabel}>{t('usage_stats.range_custom_start')}</span>
-            <input
-              type="datetime-local"
-              value={customRange.start}
-              onChange={(e) => setCustomRange((prev) => ({ ...prev, start: e.target.value }))}
-              className={styles.customRangeInput}
-              max={customRange.end || undefined}
-            />
+          <section className={styles.customRangeFieldCard} aria-label={t('usage_stats.range_custom_start')}>
+            <div className={styles.customRangeFieldHeader}>
+              <div className={styles.customRangeFieldTitleWrap}>
+                <span className={styles.customRangeLabel}>{t('usage_stats.range_custom_start')}</span>
+              </div>
+              <button
+                type="button"
+                className={styles.customRangeTextBtn}
+                onClick={() => handleSetCustomToNow('start')}
+              >
+                {t('usage_stats.range_custom_now')}
+              </button>
+            </div>
+            <div className={styles.customRangeInputRow}>
+              <input
+                ref={startDateInputRef}
+                type="date"
+                value={customRange.start.date}
+                onChange={(e) => handleCustomRangePartChange('start', 'date', e.target.value)}
+                onClick={() => openNativePicker(startDateInputRef)}
+                className={styles.customRangeInput}
+                max={resolvedEndPoint.date || undefined}
+                aria-label={`${t('usage_stats.range_custom_start')} ${t('usage_stats.range_custom_date')}`}
+              />
+              <input
+                ref={startTimeInputRef}
+                type="time"
+                value={customRange.start.time}
+                onChange={(e) => handleCustomRangePartChange('start', 'time', e.target.value)}
+                onClick={() => openNativePicker(startTimeInputRef)}
+                className={`${styles.customRangeInput} ${styles.customRangeTimeInput}`}
+                disabled={!customRange.start.date}
+                step={60}
+                max={
+                  isSameCustomRangeDate && resolvedEndPoint.time ? resolvedEndPoint.time : undefined
+                }
+                aria-label={`${t('usage_stats.range_custom_start')} ${t('usage_stats.range_custom_clock')}`}
+              />
+            </div>
+          </section>
+          <section className={styles.customRangeFieldCard} aria-label={t('usage_stats.range_custom_end')}>
+            <div className={styles.customRangeFieldHeader}>
+              <div className={styles.customRangeFieldTitleWrap}>
+                <span className={styles.customRangeLabel}>{t('usage_stats.range_custom_end')}</span>
+                <span className={styles.customRangeMetaText}>
+                  {t('usage_stats.range_custom_end_desc')}
+                </span>
+              </div>
+              {!customRange.useCurrentEnd && (
+                <button
+                  type="button"
+                  className={styles.customRangeTextBtn}
+                  onClick={() => handleSetCustomToNow('end')}
+                >
+                  {t('usage_stats.range_custom_now')}
+                </button>
+              )}
+            </div>
+            <div className={styles.customRangeToggleRow}>
+              <ToggleSwitch
+                checked={customRange.useCurrentEnd}
+                onChange={handleUseCurrentEndChange}
+                label={t('usage_stats.range_custom_end_current')}
+                ariaLabel={t('usage_stats.range_custom_end_current')}
+              />
+            </div>
+            <div className={styles.customRangeInputRow}>
+              <input
+                ref={endDateInputRef}
+                type="date"
+                value={resolvedEndPoint.date}
+                onChange={(e) => handleCustomRangePartChange('end', 'date', e.target.value)}
+                onClick={() => openNativePicker(endDateInputRef)}
+                className={styles.customRangeInput}
+                disabled={customRange.useCurrentEnd}
+                min={customRange.start.date || undefined}
+                aria-label={`${t('usage_stats.range_custom_end')} ${t('usage_stats.range_custom_date')}`}
+              />
+              <input
+                ref={endTimeInputRef}
+                type="time"
+                value={resolvedEndPoint.time}
+                onChange={(e) => handleCustomRangePartChange('end', 'time', e.target.value)}
+                onClick={() => openNativePicker(endTimeInputRef)}
+                className={`${styles.customRangeInput} ${styles.customRangeTimeInput}`}
+                disabled={customRange.useCurrentEnd || !customRange.end.date}
+                step={60}
+                min={
+                  isSameCustomRangeDate && customRange.start.time
+                    ? customRange.start.time
+                    : undefined
+                }
+                aria-label={`${t('usage_stats.range_custom_end')} ${t('usage_stats.range_custom_clock')}`}
+              />
+            </div>
+          </section>
+          <div className={styles.customRangeActions}>
             <button
               type="button"
               className={styles.customRangeMiniBtn}
-              onClick={() => handleSetCustomToNow('start')}
+              onClick={handleClearCustom}
+              disabled={
+                !customRange.start.date &&
+                !customRange.start.time &&
+                customRange.useCurrentEnd &&
+                !customRange.end.date &&
+                !customRange.end.time
+              }
             >
-              {t('usage_stats.range_custom_now')}
+              {t('usage_stats.range_custom_clear')}
             </button>
-          </label>
-          <label className={styles.customRangeField}>
-            <span className={styles.customRangeLabel}>{t('usage_stats.range_custom_end')}</span>
-            <input
-              type="datetime-local"
-              value={customRange.end}
-              onChange={(e) => setCustomRange((prev) => ({ ...prev, end: e.target.value }))}
-              className={styles.customRangeInput}
-              min={customRange.start || undefined}
-            />
-            <button
-              type="button"
-              className={styles.customRangeMiniBtn}
-              onClick={() => handleSetCustomToNow('end')}
-            >
-              {t('usage_stats.range_custom_now')}
-            </button>
-          </label>
-          <button
-            type="button"
-            className={styles.customRangeMiniBtn}
-            onClick={handleClearCustom}
-            disabled={!customRange.start && !customRange.end}
-          >
-            {t('usage_stats.range_custom_clear')}
-          </button>
-          {!customRange.start && !customRange.end && (
+          </div>
+          {!customRange.start.date && !customRange.end.date && (
             <span className={styles.customRangeHint}>{t('usage_stats.range_custom_hint')}</span>
           )}
         </div>

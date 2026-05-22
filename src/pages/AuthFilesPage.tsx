@@ -115,6 +115,7 @@ export function AuthFilesPage() {
     deleting,
     deletingAll,
     cacheResetting,
+    mysqlSyncing,
     statusUpdating,
     batchStatusUpdating,
     fileInputRef,
@@ -125,6 +126,7 @@ export function AuthFilesPage() {
     handleDeleteAll,
     handleDownload,
     handleCacheMarkerReset,
+    handleMySQLAuthSync,
     handleStatusToggle,
     toggleSelect,
     selectAllVisible,
@@ -670,6 +672,15 @@ export function AuthFilesPage() {
           <div className={styles.headerActions}>
             <Button variant="secondary" size="sm" onClick={handleHeaderRefresh} disabled={loading}>
               {t('common.refresh')}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleMySQLAuthSync}
+              disabled={disableControls || mysqlSyncing}
+              loading={mysqlSyncing}
+            >
+              {t('auth_files.mysql_sync_button')}
             </Button>
             <Button
               size="sm"
