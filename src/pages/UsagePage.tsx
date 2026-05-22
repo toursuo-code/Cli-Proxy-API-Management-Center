@@ -60,18 +60,18 @@ ChartJS.register(
 
 const TIME_RANGE_STORAGE_KEY = 'cli-proxy-usage-time-range-v2';
 const CUSTOM_RANGE_STORAGE_KEY = 'cli-proxy-usage-custom-range-v1';
-const DEFAULT_TIME_RANGE: UsageTimeRange = '24h';
+const DEFAULT_TIME_RANGE: UsageTimeRange = 'today';
 const TIME_RANGE_OPTIONS: ReadonlyArray<{ value: UsageTimeRange; labelKey: string }> = [
   { value: 'all', labelKey: 'usage_stats.range_all' },
-  { value: '7h', labelKey: 'usage_stats.range_7h' },
-  { value: '24h', labelKey: 'usage_stats.range_24h' },
+  { value: 'today', labelKey: 'usage_stats.range_today' },
+  { value: 'yesterday', labelKey: 'usage_stats.range_yesterday' },
   { value: '7d', labelKey: 'usage_stats.range_7d' },
   { value: 'custom', labelKey: 'usage_stats.range_custom' },
 ];
 
 const isUsageTimeRange = (value: unknown): value is UsageTimeRange =>
-  value === '7h' ||
-  value === '24h' ||
+  value === 'today' ||
+  value === 'yesterday' ||
   value === '7d' ||
   value === 'all' ||
   value === 'custom';

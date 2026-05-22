@@ -20,7 +20,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { IconFilterAll } from '@/components/ui/icons';
+import { IconFilterAll, IconRefreshCw } from '@/components/ui/icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { copyToClipboard } from '@/utils/clipboard';
@@ -100,6 +100,7 @@ export function AuthFilesPage() {
   const [sortMode, setSortMode] = useState<AuthFilesSortMode>('default');
   const [batchActionBarVisible, setBatchActionBarVisible] = useState(false);
   const [uiStateHydrated, setUiStateHydrated] = useState(false);
+  const [floatingRefreshLoading, setFloatingRefreshLoading] = useState(false);
   const floatingBatchActionsRef = useRef<HTMLDivElement>(null);
   const batchActionAnimationRef = useRef<AnimationPlaybackControlsWithThen | null>(null);
   const previousSelectionCountRef = useRef(0);
@@ -334,6 +335,16 @@ export function AuthFilesPage() {
     await Promise.all([loadFiles(), loadExcluded(), loadModelAlias()]);
   }, [loadFiles, loadExcluded, loadModelAlias]);
 
+  const handleFloatingRefresh = useCallback(async () => {
+    if (floatingRefreshLoading) return;
+    setFloatingRefreshLoading(true);
+    try {
+      await loadFiles({ silent: true });
+    } finally {
+      setFloatingRefreshLoading(false);
+    }
+  }, [floatingRefreshLoading, loadFiles]);
+
   useHeaderRefresh(handleHeaderRefresh);
 
   useEffect(() => {
@@ -345,7 +356,7 @@ export function AuthFilesPage() {
 
   useInterval(
     () => {
-      void loadFiles().catch(() => {});
+      void loadFiles({ silent: true }).catch(() => {});
     },
     isCurrentLayer ? 240_000 : null
   );
@@ -932,6 +943,25 @@ export function AuthFilesPage() {
         onSave={handlePrefixProxySave}
         onChange={handlePrefixProxyChange}
       />
+
+      {typeof document !== 'undefined'
+        ? createPortal(
+            <button
+              type="button"
+              className={styles.floatingRefreshButton}
+              onClick={() => void handleFloatingRefresh()}
+              disabled={disableControls || floatingRefreshLoading}
+              aria-label={t('common.refresh')}
+              title={t('common.refresh')}
+            >
+              <IconRefreshCw
+                size={20}
+                className={`${styles.floatingRefreshIcon} ${floatingRefreshLoading ? styles.floatingRefreshIconSpinning : ''}`}
+              />
+            </button>,
+            document.body
+          )
+        : null}
 
       {batchActionBarVisible && typeof document !== 'undefined'
         ? createPortal(

@@ -110,7 +110,7 @@ export interface ModelStatsSummary {
   latencySampleCount: number;
 }
 
-export type UsageTimeRange = '7h' | '24h' | '7d' | 'all' | 'custom';
+export type UsageTimeRange = 'today' | 'yesterday' | '7d' | 'all' | 'custom';
 
 export interface UsageTimeWindow {
   /** 起始时间（毫秒，含）。undefined 表示不限。 */
@@ -145,16 +145,23 @@ export function getBuiltinModelPrices(): Record<string, ModelPrice> {
 const BUILTIN_MODEL_PRICE_KEYS = Object.freeze(
   Object.keys(BUILTIN_MODEL_PRICES).sort((a, b) => b.length - a.length)
 );
-const USAGE_TIME_RANGE_MS: Record<Exclude<UsageTimeRange, 'all' | 'custom'>, number> = {
-  '7h': 7 * 60 * 60 * 1000,
-  '24h': 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000,
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const USAGE_TIME_RANGE_MS: Record<'7d', number> = {
+  '7d': 7 * DAY_IN_MS,
+};
+
+const getStartOfLocalDayMs = (timestampMs: number): number => {
+  const date = new Date(timestampMs);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 };
 
 /**
  * 把时间范围解析为绝对 [startMs, endMs] 窗口。
  * - 'all' → 不限制
  * - 'custom' → 使用传入的 customWindow
+ * - 'today' → 当地时间今天 00:00 到 nowMs
+ * - 'yesterday' → 当地时间昨天 00:00 到 23:59:59.999
  * - 其他预设 → 以 nowMs 为终点回溯固定窗口
  */
 export function resolveUsageTimeWindow(
@@ -177,6 +184,16 @@ export function resolveUsageTimeWindow(
         : undefined;
     if (startMs === undefined && endMs === undefined) return null;
     return { startMs, endMs };
+  }
+  if (range === 'today') {
+    return { startMs: getStartOfLocalDayMs(nowMs), endMs: nowMs };
+  }
+  if (range === 'yesterday') {
+    const todayStartMs = getStartOfLocalDayMs(nowMs);
+    return {
+      startMs: todayStartMs - DAY_IN_MS,
+      endMs: todayStartMs - 1,
+    };
   }
   const rangeMs = USAGE_TIME_RANGE_MS[range];
   if (!Number.isFinite(rangeMs) || rangeMs <= 0) return null;
